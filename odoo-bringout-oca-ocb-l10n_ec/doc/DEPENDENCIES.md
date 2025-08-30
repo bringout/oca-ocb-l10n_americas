@@ -3,8 +3,8 @@
 This addon depends on:
 
 - base
-- [base_iban](../../../../../oca-ocb-core/odoo-bringout-oca-ocb-base_iban)
-- [account](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account)
-- [account_debit_note](../../../../../oca-ocb-accounting/odoo-bringout-oca-ocb-account_debit_note)
-- [l10n_latam_invoice_document](../../../../../oca-ocb-l10n_europe/odoo-bringout-oca-ocb-l10n_latam_invoice_document)
-- [l10n_latam_base](../../../../../oca-ocb-l10n_europe/odoo-bringout-oca-ocb-l10n_latam_base)
+- [base_iban](https://github.com/bringout/oca-ocb-core)
+- [account](https://github.com/bringout/oca-ocb-accounting)
+- [account_debit_note](https://github.com/bringout/oca-ocb-accounting)
+- [l10n_latam_invoice_document](https://github.com/bringout/oca-ocb-l10n_europe)
+- [l10n_latam_base](https://github.com/bringout/oca-ocb-l10n_europe)
