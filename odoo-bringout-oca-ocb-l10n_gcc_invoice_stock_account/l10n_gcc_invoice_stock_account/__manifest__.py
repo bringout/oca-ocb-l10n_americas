@@ -4,10 +4,8 @@
     'name': "Gulf Cooperation Council WMS Accounting",
     'version': '1.0',
     'description': """
-        Arabic/English for GCC + lot/SN numbers
+Adds Arabic as a secondary language for the lots and serial numbers
     """,
-    'author': "Odoo S.A.",
-    'website': "https://www.odoo.com",
     'category': 'Accounting/Localizations',
 
     'depends': ['l10n_gcc_invoice', 'stock_account'],
@@ -16,5 +14,6 @@
         'views/report_invoice.xml',
     ],
     'auto_install': True,
+    'author': 'Odoo S.A.',
     'license': 'LGPL-3',
 }

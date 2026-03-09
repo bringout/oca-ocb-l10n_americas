@@ -9,7 +9,6 @@ _logger = logging.getLogger(__name__)
 
 
 class ResPartner(models.Model):
-
     _inherit = 'res.partner'
 
     l10n_ar_vat = fields.Char(
@@ -22,15 +21,11 @@ class ResPartner(models.Model):
     l10n_ar_gross_income_number = fields.Char('Gross Income Number')
     l10n_ar_gross_income_type = fields.Selection(
         [('multilateral', 'Multilateral'), ('local', 'Local'), ('exempt', 'Exempt')],
-        'Gross Income Type', help='Type of gross income: exempt, local, multilateral')
+        'Gross Income Type', help='Argentina: Type of gross income: exempt, local, multilateral.')
     l10n_ar_afip_responsibility_type_id = fields.Many2one(
-        'l10n_ar.afip.responsibility.type', string='AFIP Responsibility Type', index='btree_not_null', help='Defined by AFIP to'
+        'l10n_ar.afip.responsibility.type', string='ARCA Responsibility Type', index='btree_not_null', help='Defined by ARCA to'
         ' identify the type of responsibilities that a person or a legal entity could have and that impacts in the'
         ' type of operations and requirements they need.')
-    l10n_ar_special_purchase_document_type_ids = fields.Many2many(
-        'l10n_latam.document.type', 'res_partner_document_type_rel', 'partner_id', 'document_type_id',
-        string='Other Purchase Documents', help='Set here if this partner can issue other documents further than'
-        ' invoices, credit notes and debit notes')
 
     @api.depends('l10n_ar_vat')
     def _compute_l10n_ar_formatted_vat(self):
@@ -57,16 +52,20 @@ class ResPartner(models.Model):
         remaining = self - recs_ar_vat
         remaining.l10n_ar_vat = False
 
-    @api.constrains('vat', 'l10n_latam_identification_type_id')
-    def check_vat(self):
+    def _run_check_identification(self, validation='error'):
         """ Since we validate more documents than the vat for Argentinean partners (CUIT - VAT AR, CUIL, DNI) we
         extend this method in order to process it. """
-        # NOTE by the moment we include the CUIT (VAT AR) validation also here because we extend the messages
-        # errors to be more friendly to the user. In a future when Odoo improve the base_vat message errors
-        # we can change this method and use the base_vat.check_vat_ar method.s
-        l10n_ar_partners = self.filtered(lambda p: p.l10n_latam_identification_type_id.l10n_ar_afip_code or p.country_code == 'AR')
-        l10n_ar_partners.l10n_ar_identification_validation()
-        return super(ResPartner, self - l10n_ar_partners).check_vat()
+        l10n_ar_partners = self.filtered(lambda p: p.vat and (
+            p.l10n_latam_identification_type_id.l10n_ar_afip_code
+            or p.country_code == 'AR'
+        ))
+        for partner in l10n_ar_partners:
+            if id_number := partner._get_id_number_sanitize():
+                partner.vat = str(id_number)
+            if validation == 'error':
+                partner._l10n_ar_identification_validation()
+
+        return super(ResPartner, self - l10n_ar_partners)._run_check_identification(validation=validation)
 
     @api.model
     def _commercial_fields(self):
@@ -81,8 +80,14 @@ class ResPartner(models.Model):
         This method can be used to validate is the VAT is proper defined in the partner """
         self.ensure_one()
         if not self.l10n_ar_vat:
-            raise UserError(_('No VAT configured for partner [%i] %s') % (self.id, self.name))
+            raise UserError(_('No VAT configured for partner [%i] %s', self.id, self.name))
         return self.l10n_ar_vat
+
+    def _get_frontend_writable_fields(self):
+        frontend_writable_fields = super()._get_frontend_writable_fields()
+        frontend_writable_fields.add('l10n_ar_afip_responsibility_type_id')
+
+        return frontend_writable_fields
 
     def _get_validation_module(self):
         self.ensure_one()
@@ -91,7 +96,7 @@ class ResPartner(models.Model):
         elif self.l10n_latam_identification_type_id.l10n_ar_afip_code == '96':
             return stdnum.ar.dni
 
-    def l10n_ar_identification_validation(self):
+    def _l10n_ar_identification_validation(self):
         for rec in self.filtered('vat'):
             try:
                 module = rec._get_validation_module()
@@ -110,6 +115,9 @@ class ResPartner(models.Model):
                 raise ValidationError(_('Invalid length for "%s"', rec.l10n_latam_identification_type_id.name))
             except module.InvalidFormat:
                 raise ValidationError(_('Only numbers allowed for "%s"', rec.l10n_latam_identification_type_id.name))
+            except module.InvalidComponent:
+                valid_cuit = ('20', '23', '24', '27', '30', '33', '34', '50', '51', '55')
+                raise ValidationError(_('CUIT number must be prefixed with one of the following: %s', ', '.join(valid_cuit)))
             except Exception as error:
                 raise ValidationError(repr(error))
 
@@ -124,5 +132,5 @@ class ResPartner(models.Model):
             res = int(stdnum.ar.cuit.compact(self.vat))
         else:
             id_number = re.sub('[^0-9]', '', self.vat)
-            res = int(id_number)
+            res = id_number and int(id_number)
         return res

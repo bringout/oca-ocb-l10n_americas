@@ -2,7 +2,7 @@
 
 {
     'name': 'Indonesia E-faktur (Coretax)',
-    'icon': '/l10n_id/static/description/icon.png',
+    'icon': '/account/static/description/l10n.png',
     'version': '1.0',
     'description': """
         E-invoicing feature provided by DJP (Indonesian Tax Office). As of January 1st 2025,
@@ -13,7 +13,7 @@
         is resulting to 11%.
     """,
     'category': 'Accounting/Localizations/EDI',
-    'depends': ['l10n_id', 'l10n_id_efaktur'],
+    'depends': ['l10n_id'],
     'data': [
         # New Data Import (E-Faktur code related)
         "data/l10n_id_efaktur_coretax.product.code.csv",
@@ -24,6 +24,7 @@
 
         # Accesses
         "security/ir.model.access.csv",
+        "security/ir_rule.xml",
 
         # Views
         "views/product_template.xml",
@@ -36,6 +37,6 @@
     ],
     'installable': True,
     'auto_install': True,
-    'post_init_hook': '_post_init_hook',
+    'author': 'Odoo S.A.',
     'license': 'LGPL-3',
 }

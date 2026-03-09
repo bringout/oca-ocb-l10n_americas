@@ -2,14 +2,13 @@ from odoo import models, api, fields, _
 from odoo.exceptions import UserError
 
 
-class L10nLatamDocumentType(models.Model):
-
+class L10n_LatamDocumentType(models.Model):
     _inherit = 'l10n_latam.document.type'
 
     l10n_ar_letter = fields.Selection(
         selection='_get_l10n_ar_letters',
         string='Letters',
-        help='Letters defined by the AFIP that can be used to identify the'
+        help='Letters defined by the ARCA that can be used to identify the'
         ' documents presented to the government and that depends on the'
         ' operation type, the responsibility of both the issuer and the'
         ' receptor of the document')
@@ -44,15 +43,19 @@ class L10nLatamDocumentType(models.Model):
         if not document_number:
             return False
 
-        msg = "'%s' " + _("is not a valid value for") + " '%s'.<br/>%s"
-
         if not self.code:
             return document_number
 
         # Import Dispatch Number Validator
         if self.code in ['66', '67']:
             if len(document_number) != 16:
-                raise UserError(msg % (document_number, self.name, _('The number of import Dispatch must be 16 characters')))
+                raise UserError(
+                    _(
+                        "%(value)s is not a valid value for %(field)s.\nThe number of import Dispatch must be 16 characters.",
+                        value=document_number,
+                        field=self.name,
+                    ),
+                )
             return document_number
 
         # Invoice Number Validator (For Eg: 123-123)
@@ -68,9 +71,12 @@ class L10nLatamDocumentType(models.Model):
                 failed = True
             document_number = '{:>05s}-{:>08s}'.format(pos, number)
         if failed:
-            raise UserError(msg % (document_number, self.name, _(
-                'The document number must be entered with a dash (-) and a maximum of 5 characters for the first part'
-                'and 8 for the second. The following are examples of valid numbers:\n* 1-1\n* 0001-00000001'
-                '\n* 00001-00000001')))
+            raise UserError(
+                _(
+                    "%(value)s is not a valid value for %(field)s.\nThe document number must be entered with a dash (-) and a maximum of 5 characters for the first part and 8 for the second. The following are examples of valid numbers:\n* 1-1\n* 0001-00000001\n* 00001-00000001",
+                    value=document_number,
+                    field=self.name,
+                ),
+            )
 
         return document_number

@@ -30,7 +30,9 @@ class PartnerIdTypeEc(enum.Enum):
         Returns ID code for move and partner based on subset of Table 2 of SRI's ATS specification
         """
         partner_id_type = partner._l10n_ec_get_identification_type()
-        if move_type.startswith('in_'):
+        if partner.vat and verify_final_consumer(partner.vat):
+            return cls.FINAL_CONSUMER
+        elif move_type.startswith('in_'):
             if partner_id_type == 'ruc':  # includes final consumer
                 return cls.IN_RUC
             elif partner_id_type == 'cedula':
@@ -47,7 +49,6 @@ class PartnerIdTypeEc(enum.Enum):
 
 
 class ResPartner(models.Model):
-
     _inherit = "res.partner"
 
     l10n_ec_vat_validation = fields.Char(
@@ -56,26 +57,18 @@ class ResPartner(models.Model):
         help="Error message when validating the Ecuadorian VAT",
     )
 
-    @api.constrains("vat", "country_id", "l10n_latam_identification_type_id")
-    def check_vat(self):
-        it_ruc = self.env.ref("l10n_ec.ec_ruc", False)
-        it_dni = self.env.ref("l10n_ec.ec_dni", False)
-        ecuadorian_partners = self.filtered(
-            lambda x: x.country_id == self.env.ref("base.ec")
-        )
-        for partner in ecuadorian_partners:
-            if partner.vat:
-                if partner.l10n_latam_identification_type_id.id in (
-                    it_ruc.id,
-                    it_dni.id,
-                ):
-                    if partner.l10n_latam_identification_type_id.id == it_dni.id and len(partner.vat) != 10:
-                        raise ValidationError(_('If your identification type is %s, it must be 10 digits')
-                                              % it_dni.display_name)
-                    if partner.l10n_latam_identification_type_id.id == it_ruc.id and len(partner.vat) != 13:
-                        raise ValidationError(_('If your identification type is %s, it must be 13 digits')
-                                              % it_ruc.display_name)
-        return super(ResPartner, self - ecuadorian_partners).check_vat()
+    def _run_check_identification(self, validation='error'):
+        """ Since we validate more documents than the vat for Argentinean partners (CUIT - VAT AR, CUIL, DNI) we
+        extend this method in order to process it. """
+        l10n_ec_partners = self.filtered(lambda p: p.vat and p.country_code == 'EC')
+        if l10n_ec_partners and validation == 'error':
+            it_dni = self.env.ref("l10n_ec.ec_dni", False)
+            for partner in l10n_ec_partners.filtered(lambda p: p.l10n_latam_identification_type_id == it_dni):
+                if len(partner.vat) != 10 or not partner.vat.isdecimal():
+                    raise ValidationError(_('If your identification type is %s, it must be 10 digits',
+                                            it_dni.display_name))
+
+        return super(ResPartner, self - l10n_ec_partners)._run_check_identification(validation=validation)
 
     @api.depends("vat", "country_id", "l10n_latam_identification_type_id")
     def _compute_l10n_ec_vat_validation(self):
@@ -90,10 +83,10 @@ class ResPartner(models.Model):
                 if not final_consumer:
                     if partner.l10n_latam_identification_type_id.id == it_dni.id and not ci.is_valid(partner.vat):
                         partner.l10n_ec_vat_validation = _("The VAT %s seems to be invalid as the tenth digit doesn't comply with the validation algorithm "
-                                                           "(could be an old VAT number)") % partner.vat
+                                                           "(could be an old VAT number)", partner.vat)
                     if partner.l10n_latam_identification_type_id.id == it_ruc.id and not ruc.is_valid(partner.vat):
                         partner.l10n_ec_vat_validation = _("The VAT %s seems to be invalid as the tenth digit doesn't comply with the validation algorithm "
-                                                           "(SRI has stated that this validation is not required anymore for some VAT numbers)") % partner.vat
+                                                           "(SRI has stated that this validation is not required anymore for some VAT numbers)", partner.vat)
 
     def _l10n_ec_get_identification_type(self):
         """Maps Odoo identification types to Ecuadorian ones.
