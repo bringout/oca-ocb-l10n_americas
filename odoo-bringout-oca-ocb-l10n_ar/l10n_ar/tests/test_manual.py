@@ -1,5 +1,4 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-from unittest import skip
 
 from . import common
 from odoo import Command
@@ -37,9 +36,9 @@ class TestArManual(common.TestArCommon):
         self.assertEqual(invoice.sequence_number, 1)
 
     def test_02_fiscal_position(self):
-        # ADHOC SA > IVA Responsable Inscripto > Without Fiscal Positon
+        # ADHOC SA > IVA Responsable Inscripto > Domestic
         invoice = self._create_invoice_ar(partner_id=self.partner)
-        self.assertFalse(invoice.fiscal_position_id, 'Fiscal position should be set to empty')
+        self.assertEqual(invoice.fiscal_position_id, self.env.company.domestic_fiscal_position_id)
 
         # Consumidor Final > IVA Responsable Inscripto > Without Fiscal Positon
         invoice = self._create_invoice_ar(partner_id=self.partner_cf)
@@ -347,6 +346,47 @@ class TestArManual(common.TestArCommon):
                 partner_form.vat = "test"
         self.assertIn('Only numbers allowed for "DNI"', str(e.exception))
 
+    def test_l10n_ar_get_invoice_totals_for_report_refund_with_same_code(self):
+        """Test _l10n_ar_get_invoice_totals_for_report for refund invoices with ARCA codes that can be used for both invoice and refund"""
+        # Create a credit note with document type 60 that can be used as both invoice and refund
+        doc_60_lp_a = self.env.ref('l10n_ar.dc_a_cvl')
+
+        credit_note = self._create_invoice_ar(
+            ref='test_credit_note_refund: Credit note with document type 60 for refund test',
+            move_type='out_refund',
+            partner_id=self.res_partner_adhoc,
+            company_id=self.company_ri,
+            invoice_date="2021-03-20",
+            l10n_latam_document_type_id=doc_60_lp_a,
+        )
+
+        # Verify this is considered a refund invoice with special ARCA code
+        self.assertTrue(credit_note._l10n_ar_is_refund_invoice())
+
+        # Test the _l10n_ar_get_invoice_totals_for_report method
+        self._assert_tax_totals_summary(credit_note._l10n_ar_get_invoice_totals_for_report(), {
+            'same_tax_base': True,
+            'currency_id': self.currency.id,
+            'base_amount_currency': -100.0,
+            'tax_amount_currency': -21.0,
+            'total_amount_currency': -121.0,
+            'subtotals': [
+                {
+                    'name': "Untaxed Amount",
+                    'base_amount_currency': -100.0,
+                    'tax_amount_currency': -21.0,
+                    'tax_groups': [
+                        {
+                            'id': self.tax_21.tax_group_id.id,
+                            'base_amount_currency': -100.0,
+                            'tax_amount_currency': -21.0,
+                            'display_base_amount_currency': -100.0,
+                        },
+                    ],
+                },
+            ],
+        })
+
     def test_create_debit_note_for_credit_note(self):
         """
         Test that it is possible to create a debit note from a credit note
@@ -372,40 +412,3 @@ class TestArManual(common.TestArCommon):
         })
         debit_note_wizard.create_debit()
         self.assertTrue(invoice.reversal_move_ids.debit_note_ids)
-
-    @skip("TODO: failing test. 'Fix' the rounding error")
-    def test_l10n_ar_rounding_01(self):
-        self.env.company.tax_calculation_rounding_method = 'round_globally'
-        currency_usd = self.env.ref('base.USD')
-        currency_usd.active = True
-
-        self.env['res.currency.rate'].create([{
-            'name': '2025-04-01',
-            'inverse_company_rate': 1066.50,
-            'currency_id': currency_usd.id,
-            'company_id': self.env.company.id,
-        }])
-        tax_02 = self.percent_tax(0.2)
-        invoice_a = self._create_invoice_ar(
-            invoice_date='2025-04-02',
-            currency_id=currency_usd,
-            invoice_line_ids=[self._prepare_invoice_line(price_unit=124, tax_ids=tax_02)],
-        )
-        self.assertEqual(invoice_a.amount_total, invoice_a.invoice_line_ids.price_total, 'The invoice total should match the line total since there is only one line.')
-
-        tax_lines_a = invoice_a.line_ids \
-            .filtered(lambda x: x.tax_line_id) \
-            .sorted(lambda x: (x.move_id.id, x.tax_line_id.id, x.tax_ids.ids, x.tax_repartition_line_id.id))
-        self.env.company.tax_calculation_rounding_method = 'round_per_line'
-        invoice_b = self._create_invoice_ar(
-            invoice_date='2025-04-02',
-            currency_id=currency_usd,
-            invoice_line_ids=[self._prepare_invoice_line(price_unit=124, tax_ids=tax_02)],
-        )
-        self.assertEqual(invoice_b.amount_total, invoice_b.invoice_line_ids.price_total, 'The invoice total should match the line total since there is only one line.')
-
-        tax_lines_b = invoice_b.line_ids \
-            .filtered(lambda x: x.tax_line_id) \
-            .sorted(lambda x: (x.move_id.id, x.tax_line_id.id, x.tax_ids.ids, x.tax_repartition_line_id.id))
-
-        self.assertEqual(tax_lines_a.balance, tax_lines_b.balance, 'Tax balances should be equal since both invoices have a single line and the total matches the line amount.')

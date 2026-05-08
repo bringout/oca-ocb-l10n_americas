@@ -10,9 +10,6 @@ class AccountChartTemplate(models.AbstractModel):
     def _get_cl_template_data(self):
         return {
             'code_digits': '6',
-            'property_account_receivable_id': 'account_110310',
-            'property_account_payable_id': 'account_210210',
-            'property_stock_valuation_account_id': 'account_110610',
         }
 
     @template('cl', 'res.company')
@@ -32,7 +29,8 @@ class AccountChartTemplate(models.AbstractModel):
                 'account_purchase_tax_id': 'OTAX_19',
                 'expense_account_id': 'account_410235',
                 'income_account_id': 'account_310115',
-                'account_stock_journal_id': 'inventory_valuation',
+                'receivable_account_id': 'account_110310',
+                'payable_account_id': 'account_210210',
                 'account_stock_valuation_id': 'account_110612',
             },
         }
@@ -44,4 +42,10 @@ class AccountChartTemplate(models.AbstractModel):
                 'account_stock_expense_id': 'account_410230',
                 'account_stock_variation_id': 'account_603100',
             },
+            'account_110625': {'asset_depreciation_account_id': 'account_121310', 'asset_expense_account_id': 'account_410141'},
+            'account_110730': {'asset_depreciation_account_id': 'account_121310', 'asset_expense_account_id': 'account_420120'},
+            'account_121110': {'asset_depreciation_account_id': 'account_121310', 'asset_expense_account_id': 'account_410141'},
+            'account_121120': {'asset_depreciation_account_id': 'account_121320', 'asset_expense_account_id': 'account_410141'},
+            'account_121130': {'asset_depreciation_account_id': 'account_121330', 'asset_expense_account_id': 'account_410141'},
+            'account_150405': {'asset_depreciation_account_id': 'account_121330', 'asset_expense_account_id': 'account_420120'},
         }

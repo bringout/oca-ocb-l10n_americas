@@ -10,17 +10,25 @@ class AccountChartTemplate(models.AbstractModel):
     def _get_mx_template_data(self):
         return {
             'code_digits': '9',
-            'display_invoice_amount_total_words': True,
-            'property_account_receivable_id': 'cuenta105_01',
-            'property_account_payable_id': 'cuenta201_01',
-            'property_stock_valuation_account_id': 'cuenta115_01',
-            'property_cash_basis_base_account_id': 'cuenta801_01_99',
         }
+
+    def _get_account_parent_xmlid(self, code_prefix, template_code):
+        if template_code == 'mx':
+            return {
+                '102.01.0': 'account_subgroup_bancos_nacionales',
+                '101.01.0': 'account_subgroup_caja_y_efectivo',
+                '102.01.01': 'account_subgroup_bancos_nacionales',
+                '403.01': 'account_subgroup_otros_ingresos_1',
+                '601.84': 'account_subgroup_otros_gastos_generales',
+            }.get(code_prefix)
+
+        return super()._get_account_parent_xmlid(code_prefix, template_code)
 
     @template('mx', 'res.company')
     def _get_mx_res_company(self):
         return {
             self.env.company.id: {
+                'display_invoice_amount_total_words': True,
                 'anglo_saxon_accounting': True,
                 'account_fiscal_country_id': 'base.mx',
                 'bank_account_code_prefix': '102.01.0',
@@ -37,10 +45,11 @@ class AccountChartTemplate(models.AbstractModel):
                 'account_purchase_tax_id': 'tax14',
                 'expense_account_id': 'cuenta601_84',
                 'income_account_id': 'cuenta401_01',
+                'receivable_account_id': 'cuenta105_01',
+                'payable_account_id': 'cuenta201_01',
                 'account_cash_basis_base_account_id': 'cuenta801_01_99',
                 'l10n_mx_income_return_discount_account_id': 'cuenta402_01',
                 'l10n_mx_income_re_invoicing_account_id': 'cuenta402_04',
-                'account_stock_journal_id': 'inventory_valuation',
                 'account_stock_valuation_id': 'cuenta115_01',
             },
         }
@@ -67,10 +76,12 @@ class AccountChartTemplate(models.AbstractModel):
             accounts_data.update({
                 'default_cash_difference_income_account_id': {
                     'name': _('Other Income'),
+                    'parent_id': self._get_account_parent_id('403.01'),
                     'code': '403.01.01'
                 },
                 'default_cash_difference_expense_account_id': {
                     'name': 'Cash Difference Loss',
+                    'parent_id': self._get_account_parent_id('601.84'),
                     'code': '601.84.02',
                 }
             })

@@ -8,12 +8,7 @@ class AccountChartTemplate(models.AbstractModel):
 
     @template('uy')
     def _get_uy_template_data(self):
-        return {
-            'property_account_receivable_id': 'uy_code_11300',
-            'property_account_payable_id': 'uy_code_21100',
-            'code_digits': '6',
-            'name': _('Uruguayan Generic Chart of Accounts'),
-        }
+        return {}
 
     @template('uy', 'res.company')
     def _get_uy_res_company(self):
@@ -34,7 +29,8 @@ class AccountChartTemplate(models.AbstractModel):
                 'deferred_revenue_account_id': 'uy_code_21321',
                 'income_account_id': 'uy_code_4102',
                 'expense_account_id': 'uy_code_5100',
-                'account_stock_journal_id': 'inventory_valuation',
+                'receivable_account_id': 'uy_code_11300',
+                'payable_account_id': 'uy_code_21100',
                 'account_stock_valuation_id': 'uy_code_11704',
             },
         }
@@ -70,4 +66,12 @@ class AccountChartTemplate(models.AbstractModel):
             'uy_code_11704': {
                 'account_stock_variation_id': 'uy_code_5401',
             },
+            'uy_code_12401': {'asset_depreciation_account_id': 'uy_code_12420', 'asset_expense_account_id': 'uy_code_5500'},
+            'uy_code_12402': {'asset_depreciation_account_id': 'uy_code_12421', 'asset_expense_account_id': 'uy_code_5500'},
+            'uy_code_12403': {'asset_depreciation_account_id': 'uy_code_12422', 'asset_expense_account_id': 'uy_code_5500'},
+            'uy_code_12404': {'asset_depreciation_account_id': 'uy_code_12423', 'asset_expense_account_id': 'uy_code_5500'},
+            'uy_code_12405': {'asset_depreciation_account_id': 'uy_code_12422', 'asset_expense_account_id': 'uy_code_5500'},
+            'uy_code_12407': {'asset_depreciation_account_id': 'uy_code_12421', 'asset_expense_account_id': 'uy_code_5500'},
+            'uy_code_12408': {'asset_depreciation_account_id': 'uy_code_12520', 'asset_expense_account_id': 'uy_code_5500'},
+            'uy_code_12409': {'asset_depreciation_account_id': 'uy_code_12423', 'asset_expense_account_id': 'uy_code_5500'},
         }
