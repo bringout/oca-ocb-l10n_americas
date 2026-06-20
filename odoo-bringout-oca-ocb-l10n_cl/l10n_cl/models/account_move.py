@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+import re
+
 from odoo.exceptions import ValidationError
 from odoo import models, fields, api, _
 from odoo.tools.misc import formatLang
@@ -14,6 +16,19 @@ class AccountMove(models.Model):
     partner_id_vat = fields.Char(related='partner_id.vat', string='VAT No')
     l10n_latam_internal_type = fields.Selection(
         related='l10n_latam_document_type_id.internal_type', string='L10n Latam Internal Type')
+
+    @api.constrains("l10n_latam_document_number")
+    def _check_l10n_latam_document_number_is_numeric(self):
+        for move in self:
+            if (
+                move.company_id.country_id.code == "CL"
+                and move.l10n_latam_use_documents
+                and move.l10n_latam_document_number
+                and not re.fullmatch(r"[0-9]+", move.l10n_latam_document_number)
+            ):
+                raise ValidationError(self.env._(
+                    "The DTE document number (folio) must contain only digits."
+                ))
 
     def _get_l10n_latam_documents_domain(self):
         self.ensure_one()
@@ -131,7 +146,13 @@ class AccountMove(models.Model):
 
     def _get_name_invoice_report(self):
         self.ensure_one()
-        if self.l10n_latam_use_documents and self.company_id.account_fiscal_country_id.code == 'CL':
+        if (
+            self.l10n_latam_use_documents and self.company_id.account_fiscal_country_id.code == "CL"
+            and (
+                self.move_type in {"out_invoice", "out_refund"}
+                or self.l10n_latam_document_type_id.code == "46"
+            )
+        ):
             return 'l10n_cl.report_invoice_document'
         return super()._get_name_invoice_report()
 
@@ -141,34 +162,18 @@ class AccountMove(models.Model):
     def _l10n_cl_get_invoice_totals_for_report(self):
         self.ensure_one()
         include_sii = self._l10n_cl_include_sii()
+        tax_totals = self.tax_totals
+        if not include_sii:
+            return tax_totals
 
-        base_lines = self.line_ids.filtered(lambda x: x.display_type == 'product')
-        tax_lines = self.line_ids.filtered(lambda x: x.display_type == 'tax')
-
-        base_line_vals_list = [x._convert_to_tax_base_line_dict() for x in base_lines]
-        if include_sii:
-            for vals in base_line_vals_list:
-                vals['taxes'] = vals['taxes'].flatten_taxes_hierarchy().filtered(lambda tax: tax.l10n_cl_sii_code != 14)
-
-        tax_line_vals_list = [x._convert_to_tax_line_dict() for x in tax_lines]
-        if include_sii:
-            tax_line_vals_list = [x for x in tax_line_vals_list if x['tax_repartition_line'].tax_id.l10n_cl_sii_code != 14]
-
-        tax_totals = self.env['account.tax']._prepare_tax_totals(
-            base_line_vals_list,
-            self.currency_id,
-            tax_lines=tax_line_vals_list,
-        )
-
-        if include_sii:
-            tax_totals['amount_total'] = self.amount_total
-            tax_totals['amount_untaxed'] = self.currency_id.round(
-                tax_totals['amount_total'] - sum([x['tax_amount'] for x in tax_line_vals_list if 'tax_amount' in x]))
-            tax_totals['formatted_amount_total'] = formatLang(self.env, tax_totals['amount_total'], currency_obj=self.currency_id)
-            tax_totals['formatted_amount_untaxed'] = formatLang(self.env, tax_totals['amount_untaxed'], currency_obj=self.currency_id)
-            if tax_totals['subtotals']:
-                tax_totals['subtotals'][0]['formatted_amount'] = tax_totals['formatted_amount_untaxed']
-
+        tax_group_ids = {
+            tax_group['id']
+            for subtotal in tax_totals['subtotals']
+            for tax_group in subtotal['tax_groups']
+        }
+        tax_group_ids_to_exclude = self.env['account.tax.group'].browse(tax_group_ids).filtered(lambda x: x.l10n_cl_sii_code == 14).ids
+        if tax_group_ids_to_exclude:
+            return self.env['account.tax']._exclude_tax_groups_from_tax_totals_summary(tax_totals, tax_group_ids_to_exclude)
         return tax_totals
 
     def _l10n_cl_include_sii(self):
@@ -212,18 +217,18 @@ class AccountMove(models.Model):
                 'subtotal_amount_taxable': 0,
                 'subtotal_amount_exempt': 0,
                 'vat_amount': 0,
-                'total_amount': currency_round_other_currency.round(abs(self.amount_total_signed)) \
+                'total_amount': currency_round_other_currency.round(abs(self.amount_total_signed))
                     if export else currency_round_other_currency.round(self.amount_total),
                 'round_currency': currency_round_other_currency.decimal_places,
                 'name': self._l10n_cl_normalize_currency_name(currency_round_other_currency.name),
-                'rate': round(abs(self.amount_total_signed) / self.amount_total, 4),
+                'rate': round(abs(self.amount_total_signed) / self.amount_total, 4) if self.amount_total else 1,
             }
         for line in self.line_ids:
             if line.tax_line_id and line.tax_line_id.l10n_cl_sii_code == 14:
                 values['vat_amount'] += line[key_main_currency] * sign_main_currency
                 if other_currency:
-                    values['second_currency']['vat_amount'] += line[key_other_currency] * sign_main_currency # amount_currency behaves as balance
-                vat_percent = line.tax_line_id.amount if line.tax_line_id.amount > vat_percent else vat_percent
+                    values['second_currency']['vat_amount'] += line[key_other_currency] * sign_main_currency
+                vat_percent = max(vat_percent, line.tax_line_id.amount)
             if line.display_type == 'product':
                 if line.tax_ids.filtered(lambda x: x.l10n_cl_sii_code == 14):
                     values['subtotal_amount_taxable'] += line[key_main_currency] * sign_main_currency
@@ -263,7 +268,6 @@ class AccountMove(models.Model):
         :return:
         """
         self.ensure_one()
-
         tax = [{'tax_code': line.tax_line_id.l10n_cl_sii_code,
                 'tax_name': line.tax_line_id.name,
                 'tax_base': abs(sum(self.invoice_line_ids.filtered(
@@ -272,9 +276,18 @@ class AccountMove(models.Model):
                 'tax_percent': abs(line.tax_line_id.amount),
                 'tax_amount_currency': self.currency_id.round(abs(line.amount_currency)),
                 'tax_amount': self.currency_id.round(abs(line.balance))} for line in self.line_ids.filtered(
-            lambda x: x.tax_group_id.id in [
-                self.env.ref('l10n_cl.tax_group_ila').id, self.env.ref('l10n_cl.tax_group_retenciones').id])]
+            lambda x: x.tax_group_id.id in [self.env['account.chart.template'].with_company(self.company_id).ref('tax_group_ila').id,
+                                            self.env['account.chart.template'].with_company(self.company_id).ref('tax_group_retenciones').id])]
         return tax
 
     def _float_repr_float_round(self, value, decimal_places):
         return float_repr(float_round(value, decimal_places), decimal_places)
+
+    def _compute_tax_totals(self):
+        # OVERRIDE 'account'
+        super()._compute_tax_totals()
+        for move in self:
+            if move.tax_totals and move._get_name_invoice_report() == 'l10n_cl.report_invoice_document':
+                # Disable the recap of tax totals in company currency at the bottom right of the invoice,
+                # since this info is already present in our custom tax totals grid.
+                move.tax_totals['display_in_company_currency'] = False

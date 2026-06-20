@@ -6,8 +6,9 @@ from odoo.tests import tagged, Form
 class TestClLatamDocumentType(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='l10n_cl.cl_chart_template'):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    @AccountTestInvoicingCommon.setup_country('cl')
+    def setUpClass(cls):
+        super().setUpClass()
 
         country_cl = cls.env.ref('base.cl')
         rut_id_type = cls.env.ref('l10n_cl.it_RUT')
@@ -80,3 +81,11 @@ class TestClLatamDocumentType(AccountTestInvoicingCommon):
             'partner_id': self.cl_partner_a.id,
             'l10n_latam_document_type_id': document_type_46.id,
         }])
+
+    def test_miscellaneous_journal_skip_numeric_folio_validation(self):
+        """Ensure numeric folio validation is skipped for miscellaneous entries."""
+        self.env['account.move'].create({
+            'move_type': 'entry',
+            'journal_id': self.env['account.journal'].search([('type', '=', 'general')], limit=1).id,
+            'l10n_latam_document_number': 'ABC123',
+        })
