@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from . import common
 from odoo.tests import tagged
+from odoo.tests.common import Form
 from odoo.tools.float_utils import float_split_str
 
 
@@ -41,11 +42,11 @@ class TestManual(common.TestAr):
 
         # Montana Sur > IVA Liberado - Ley Nº 19.640 > Compras / Ventas Zona Franca > IVA Exento
         invoice = self._create_invoice({'partner': self.res_partner_montana_sur})
-        self.assertEqual(invoice.fiscal_position_id, self._search_fp('Compras / Ventas Zona Franca'))
+        self.assertEqual(invoice.fiscal_position_id, self._search_fp('Purchases / Sales Free Trade Zone'))
 
         # Barcelona food > Cliente / Proveedor del Exterior >  > IVA Exento
         invoice = self._create_invoice({'partner': self.res_partner_barcelona_food})
-        self.assertEqual(invoice.fiscal_position_id, self._search_fp('Compras / Ventas al exterior'))
+        self.assertEqual(invoice.fiscal_position_id, self._search_fp('Purchases / Sales abroad'))
 
     def test_03_corner_cases(self):
         """ Mono partner of type Service and VAT 21 """
@@ -99,7 +100,82 @@ class TestManual(common.TestAr):
         self._prepare_multicurrency_values()
         self._post(self.demo_invoices['test_invoice_10'])
 
-    def test_15_corner_cases(self):
+    def test_15_liquido_producto_sales(self):
+        """ Manual Numbering: Sales and not POS (Liquido Producto) """
+
+        # Verify that the default sales journals ara created as is AFIP POS
+        self.assertTrue(self.journal.l10n_ar_is_pos)
+
+        # If we create an invoice it will not use manual numbering
+        invoice = self._create_invoice({'partner': self.partner})
+        self.assertFalse(invoice.l10n_latam_manual_document_number)
+
+        # Create a new sale journal that is not AFIP POS
+        self.journal = self._create_journal('preprinted', data={'l10n_ar_is_pos': False})
+        self.assertFalse(self.journal.l10n_ar_is_pos)
+
+        doc_27_lu_a = self.env.ref('l10n_ar.dc_liq_uci_a')
+        payment_term_id = self.env.ref("account.account_payment_term_end_following_month")
+
+        # 60, 61, 27, 28, 45, 46
+        # In this case manual numbering should be True and the latam document numer should be required
+        with self.assertRaisesRegex(AssertionError, 'l10n_latam_document_number is a required field'):
+            with Form(self.env['account.move'].with_context(default_move_type='out_invoice')) as invoice_form:
+                invoice_form.ref = "demo_liquido_producto_1: Vendor bill liquido producto (DOC 186)"
+                invoice_form.partner_id = self.res_partner_adhoc
+                invoice_form.invoice_payment_term_id = payment_term_id
+                invoice_form.journal_id = self.journal
+                invoice_form.l10n_latam_document_type_id = doc_27_lu_a
+            invoice = invoice_form.save()
+
+        # Adding the document number will let us to save and validate the number without any problems
+        with Form(self.env['account.move'].with_context(default_move_type='out_invoice')) as invoice_form:
+            invoice_form.ref = "demo_liquido_producto_1: Vendor bill liquido producto (DOC 186)"
+            invoice_form.partner_id = self.res_partner_adhoc
+            invoice_form.invoice_payment_term_id = payment_term_id
+            invoice_form.journal_id = self.journal
+            invoice_form.l10n_latam_document_type_id = doc_27_lu_a
+            invoice_form.l10n_latam_document_number = "00077-00000077"
+        invoice = invoice_form.save()
+
+    def test_16_liquido_producto_purchase(self):
+        """ Manual Numbering: Purchase POS/ NOT POS (Liquido Producto) """
+
+        # By default purchase journals ar not AFIP POS journal
+        purchase_not_pos_journal = self.env["account.journal"].search([
+            ('type', '=', 'purchase'), ('company_id', '=', self.env.company.id), ('l10n_latam_use_documents', '=', True)])
+        self.assertFalse(purchase_not_pos_journal.l10n_ar_is_pos)
+
+        doc_60_lp_a = self.env.ref('l10n_ar.dc_a_cvl')
+        payment_term_id = self.env.ref("account.account_payment_term_end_following_month")
+
+        with self.assertRaisesRegex(AssertionError, 'l10n_latam_document_number is a required field'):
+            with Form(self.env['account.move'].with_context(default_move_type='in_invoice')) as bill_form:
+                bill_form.ref = "demo_liquido_producto_1: Vendor bill liquido producto (DOC 186)"
+                bill_form.partner_id = self.res_partner_adhoc
+                bill_form.invoice_payment_term_id = payment_term_id
+                bill_form.invoice_date = '2023-02-09'
+                bill_form.journal_id = purchase_not_pos_journal
+                bill_form.l10n_latam_document_type_id = doc_60_lp_a
+            bill = bill_form.save()
+
+        # Create a new journal that is an AFIP POS
+        purchase_pos_journal = self._create_journal('preprinted', data={'type': 'purchase', 'l10n_ar_is_pos': True})
+
+        with Form(self.env['account.move'].with_context(default_move_type='in_invoice')) as bill_form:
+            bill_form.ref = "demo_liquido_producto_1: Vendor bill liquido producto (DOC 186)"
+            bill_form.partner_id = self.res_partner_adhoc
+            bill_form.invoice_payment_term_id = payment_term_id
+            bill_form.invoice_date = '2023-02-09'
+            bill_form.journal_id = purchase_pos_journal
+            bill_form.l10n_latam_document_type_id = doc_60_lp_a
+            bill_form.l10n_latam_document_number = "00077-00000077"
+        bill = bill_form.save()
+
+        # If we create an invoice it will not use manual numbering
+        self.assertFalse(bill.l10n_latam_manual_document_number)
+
+    def test_17_corner_cases(self):
         """ RI partner with VAT exempt and 21. Test price unit digits """
         self._post(self.demo_invoices['test_invoice_4'])
         decimal_price_digits_setting = self.env.ref('product.decimal_price').digits
@@ -171,3 +247,29 @@ class TestManual(common.TestAr):
             ],
         })
         self.assertEqual(self._get_simple_detail_ar_tax(invoice3), [("vat", 0.0)])
+
+    def test_create_debit_note_for_credit_note(self):
+        """
+        Test that it is possible to create a debit note from a credit note
+        """
+
+        invoice = self.init_invoice('out_invoice', partner=self.partner_afip, products=[self.product_a], post=True)
+
+        credit_note_wizard = self.env['account.move.reversal'].with_context({
+            'active_ids': invoice.ids,
+            'active_model': 'account.move',
+        }).create({
+            'reason': 'credit note',
+            'journal_id': invoice.journal_id.id,
+        })
+        credit_note_wizard.refund_moves()
+        invoice.reversal_move_id.action_post()
+
+        debit_note_wizard = self.env['account.debit.note'].with_context({
+            'active_ids': invoice.reversal_move_id.ids,
+            'active_model': 'account.move',
+        }).create({
+            'reason': 'debit_note',
+        })
+        debit_note_wizard.create_debit()
+        self.assertTrue(invoice.reversal_move_id.debit_note_ids)

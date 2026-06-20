@@ -22,15 +22,14 @@ class ResPartner(models.Model):
     l10n_ar_gross_income_number = fields.Char('Gross Income Number')
     l10n_ar_gross_income_type = fields.Selection(
         [('multilateral', 'Multilateral'), ('local', 'Local'), ('exempt', 'Exempt')],
-        'Gross Income Type', help='Type of gross income: exempt, local, multilateral')
+        'Gross Income Type', help='Argentina: Type of gross income: exempt, local, multilateral.')
     l10n_ar_afip_responsibility_type_id = fields.Many2one(
         'l10n_ar.afip.responsibility.type', string='AFIP Responsibility Type', index='btree_not_null', help='Defined by AFIP to'
         ' identify the type of responsibilities that a person or a legal entity could have and that impacts in the'
         ' type of operations and requirements they need.')
     l10n_ar_special_purchase_document_type_ids = fields.Many2many(
         'l10n_latam.document.type', 'res_partner_document_type_rel', 'partner_id', 'document_type_id',
-        string='Other Purchase Documents', help='Set here if this partner can issue other documents further than'
-        ' invoices, credit notes and debit notes')
+        string='Other Purchase Documents', help='This field will be deprecated in the next version as it is no longer needed.')
 
     @api.depends('l10n_ar_vat')
     def _compute_l10n_ar_formatted_vat(self):
@@ -81,7 +80,7 @@ class ResPartner(models.Model):
         This method can be used to validate is the VAT is proper defined in the partner """
         self.ensure_one()
         if not self.l10n_ar_vat:
-            raise UserError(_('No VAT configured for partner [%i] %s') % (self.id, self.name))
+            raise UserError(_('No VAT configured for partner [%i] %s', self.id, self.name))
         return self.l10n_ar_vat
 
     def _get_validation_module(self):

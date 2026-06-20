@@ -2,7 +2,7 @@
 
 {
     'name': 'Ecuador - Stock',
-    'icon': '/l10n_ec/static/description/icon.png',
+    'icon': '/account/static/description/l10n.png',
     'version': '1.0',
     'description': """Ecuador - Stock""",
     'category': 'Accounting/Localizations',

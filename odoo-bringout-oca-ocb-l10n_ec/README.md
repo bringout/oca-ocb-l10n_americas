@@ -6,7 +6,7 @@ Functional
 
 This module adds accounting features for Ecuadorian localization, which
 represent the minimum requirements to operate a business in Ecuador in compliance
-with local regulation bodies such as the ecuadorian tax authority -SRI- and the 
+with local regulation bodies such as the ecuadorian tax authority -SRI- and the
 Superintendency of Companies -Super Intendencia de Compañías-
 
 Follow the next configuration steps:
@@ -28,7 +28,7 @@ Master Data:
 * Identification types
 * Ecuador banks
 * Partners: Consumidor Final, SRI, IESS, and also basic VAT validation
-    
+
 
 ## Installation
 
@@ -38,40 +38,19 @@ pip install odoo-bringout-oca-ocb-l10n_ec
 
 ## Dependencies
 
-This addon depends on:
 - base
 - base_iban
-- account
 - account_debit_note
 - l10n_latam_invoice_document
 - l10n_latam_base
-
-## Manifest Information
-
-- **Name**: Ecuadorian Accounting
-- **Version**: 3.9
-- **Category**: Accounting/Localizations/Account Charts
-- **License**: LGPL-3
-- **Installable**: True
+- account
 
 ## Source
 
-Based on [OCA/OCB](https://github.com/OCA/OCB) branch 16.0, addon `l10n_ec`.
+- Repository: https://github.com/OCA/OCB
+- Branch: 17.0
+- Path: addons/l10n_ec
 
 ## License
 
-This package maintains the original LGPL-3 license from the upstream Odoo project.
-
-## Documentation
-
-- Overview: doc/OVERVIEW.md
-- Architecture: doc/ARCHITECTURE.md
-- Models: doc/MODELS.md
-- Controllers: doc/CONTROLLERS.md
-- Wizards: doc/WIZARDS.md
-- Install: doc/INSTALL.md
-- Usage: doc/USAGE.md
-- Configuration: doc/CONFIGURATION.md
-- Dependencies: doc/DEPENDENCIES.md
-- Troubleshooting: doc/TROUBLESHOOTING.md
-- FAQ: doc/FAQ.md
+This package preserves the original LGPL-3 license.

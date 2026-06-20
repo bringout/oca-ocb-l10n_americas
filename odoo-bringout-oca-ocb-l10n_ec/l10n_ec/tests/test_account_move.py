@@ -11,7 +11,7 @@ from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 class TestEcAccountMove(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='l10n_ec.l10n_ec_ifrs'):
+    def setUpClass(cls, chart_template_ref='ec'):
         super().setUpClass(chart_template_ref=chart_template_ref)
 
     def test_document_number_credit_note(self):
@@ -19,6 +19,7 @@ class TestEcAccountMove(AccountTestInvoicingCommon):
         Test that when creating a Credit Note in the Purchase journal with a partner not from Ecuador a document number can be anything
         If the partner is from Ecuador, an error should be raised
         """
+        self.partner_a.country_id = self.env.ref('base.us')
         self.partner_b.country_id = self.env.ref('base.ec')
 
         document_credit_note = self.env['l10n_latam.document.type'].search([
@@ -27,7 +28,7 @@ class TestEcAccountMove(AccountTestInvoicingCommon):
             ('l10n_ec_check_format', '=', True),
         ], limit=1)
         move_form = Form(self.env['account.move'].with_context(default_move_type='in_refund'))
-        move_form.partner_id = self.partner_agrolait
+        move_form.partner_id = self.partner_a
         move_form.l10n_latam_document_type_id = document_credit_note
         move_form.invoice_date = fields.Date.from_string('2024-08-08')
         move_form.l10n_latam_document_number = '123456'

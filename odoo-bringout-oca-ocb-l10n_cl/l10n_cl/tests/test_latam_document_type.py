@@ -6,7 +6,7 @@ from odoo.tests import tagged, Form
 class TestClLatamDocumentType(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='l10n_cl.cl_chart_template'):
+    def setUpClass(cls, chart_template_ref='cl'):
         super().setUpClass(chart_template_ref=chart_template_ref)
 
         country_cl = cls.env.ref('base.cl')
